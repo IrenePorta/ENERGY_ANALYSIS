@@ -1,4 +1,6 @@
-![ESCI UPF](ESCI-UPF.png)
+<p align="center">
+  <img src="ESCI-UPF.png" alt="ESCI UPF Logo">
+</p>
 
 # ENERGY_ANALYSIS
 
