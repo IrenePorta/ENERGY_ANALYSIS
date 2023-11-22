@@ -36,7 +36,7 @@ The `SCRIPTS` directory includes a series of Jupyter notebooks that outline the 
 Ensure that all necessary installations and parameters are in place as specified in the `PREVIOUS_REQUIREMENTS` directory before proceeding with the scripts.
 
 ## Report
-The `REPORT.pdf` file provides a comprehensive overview of the analysis findings and interpretations. It is a crucial document for understanding the context and results of this project.
+The `REPORT.pdf` file provides a comprehensive analysis of our findings and interpretations. It is a crucial document for understanding the context and results of this project.
 
 ## Contributors
 This project is a collaborative work by the following contributors:
