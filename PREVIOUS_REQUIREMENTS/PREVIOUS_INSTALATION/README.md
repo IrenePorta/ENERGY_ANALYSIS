@@ -15,7 +15,6 @@ conda update -n base -c defaults conda
 ```
 ---
 ### PyMOL 2.5 (optional)
-*If you want to visualize by yourself the structure.*
 
-Follow the official link to download PyMOL:
-> https://pymol.org/2/
+For the visualization and analysis of protein structures. Install PyMOL from [their website](https://pymol.org).
+
