@@ -43,4 +43,4 @@ This project is a collaborative work by the following contributors:
 - Irene Porta Bravo ([irene.porta1423@alum.esci.upf.edu](mailto:irene.porta1423@alum.esci.upf.edu))
 - Alessandra Nayeli Bonilla Salon ([alessandra.bonilla@alum.esci.upf.edu](mailto:alessandra.bonilla@alum.esci.upf.edu))
 - Alexandra Caus Carrascosa ([alexandra.caus@alum.esci.upf.edu](mailto:alexandra.caus@alum.esci.upf.edu))
-- Paula Martin Cabezas ([paula.martin@alum.esci.upf.edu](mailto:paula.martin@alum.esci.upf.edu))ç
+- Paula Martin Cabezas ([paula.martin@alum.esci.upf.edu](mailto:paula.martin@alum.esci.upf.edu))
