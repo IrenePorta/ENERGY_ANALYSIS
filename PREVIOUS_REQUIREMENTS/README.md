@@ -4,7 +4,7 @@ This directory contains all the necessary files and requirements needed to set u
 
 ## Files and Descriptions
 
-- `6m0j.cif` - The Crystallographic Information File (CIF) containing the 3D structure of the protein of interest.
+- `6m0j_new.pdb` - A PDB file crated form scratch adding a new empty chain those residues that were not heteroatms. 
 - `6m0j.pdb` - The Protein Data Bank (PDB) file with the 3D coordinates of the protein structure.
 - `6m0j_fixed.pdb` - A PDB file with corrected coordinates and possibly optimized for better computational analysis.
 - `residue_library.txt` - A text file containing a library of raw residue data used in the energy calculations.
