@@ -14,7 +14,7 @@ This directory contains all the necessary files and requirements needed to set u
 
 Before starting the energy analysis, ensure that all necessary software and libraries are installed. The following requirements must be met:
 
-- **PyMOL**: For the visualization and analysis of protein structures. Install PyMOL from [their website](https://pymol.org) or via a package manager.
+- **PyMOL**: For the visualization and analysis of protein structures. Install PyMOL from [their website](https://pymol.org).
 - **Python**: Ensure that Python is installed and properly configured. The analysis scripts are compatible with Python 3.x.
 - **Biopython**: This library is essential for parsing PDB files and performing computational tasks. Install it using `pip install biopython`.
 - **NACCESS**: The NACCESS tool is used for accessible surface area calculations.
