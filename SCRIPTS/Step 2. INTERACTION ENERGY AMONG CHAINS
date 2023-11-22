@@ -1,0 +1,752 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "e4beb640",
+   "metadata": {},
+   "source": [
+    "### Library Imports"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 63,
+   "id": "d9a0131d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import argparse\n",
+    "import sys\n",
+    "import os\n",
+    "import math\n",
+    "\n",
+    "from Bio import PDB\n",
+    "from Bio.PDB.PDBParser import PDBParser\n",
+    "from Bio.PDB.NACCESS import NACCESS_atomic\n",
+    "from Bio.PDB.NeighborSearch import NeighborSearch\n",
+    "from Bio.PDB.PDBIO import PDBIO, Select\n",
+    "import biobb_structure_checking\n",
+    "import biobb_structure_checking.constants as cts\n",
+    "from biobb_structure_checking.structure_checking import StructureChecking\n",
+    "base_dir_path=biobb_structure_checking.__path__[0]\n",
+    "args = cts.set_defaults(base_dir_path,{'notebook':True})"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b4186e35",
+   "metadata": {},
+   "source": [
+    "## STEP 1\n",
+    "- Function **get_interface_residues** takes a structure and two chain identifiers as input along with a distance cutoff value. It uses these to find residues in each chain that are within the cutoff distance of each other, which denotes the interface between the two chains.\n",
+    "- Then uses this function to identify and print out the interface residues for chains A and E of our structure (6m0j_fixed.pdb)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3287a91f",
+   "metadata": {},
+   "source": [
+    "### OPTION CODE 1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 64,
+   "id": "b8a6eb26",
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Interface residues in Chain A: [386, 387, 393, 19, 21, 24, 27, 28, 30, 31, 34, 35, 37, 38, 41, 42, 45, 324, 325, 326, 330, 79, 82, 83, 351, 352, 353, 354, 355, 357]\n",
+      "Interface residues in Chain E: [403, 417, 445, 446, 447, 449, 453, 455, 456, 473, 475, 476, 477, 484, 485, 486, 487, 489, 490, 493, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505]\n"
+     ]
+    }
+   ],
+   "source": [
+    "def get_interface_residues(structure, chain1_id, chain2_id, distance_cutoff):\n",
+    "    model = structure[0]\n",
+    "\n",
+    "    # Extract atoms from the two specified chains\n",
+    "    chain1_atoms = [atom for atom in model[chain1_id].get_atoms()]\n",
+    "    chain2_atoms = [atom for atom in model[chain2_id].get_atoms()]\n",
+    "\n",
+    "    # Create NeighborSearch objects for each chain\n",
+    "    ns_chain1 = NeighborSearch(chain1_atoms)\n",
+    "    ns_chain2 = NeighborSearch(chain2_atoms)\n",
+    "\n",
+    "    # Identify interface residues by searching for neighbors in the opposite chain\n",
+    "    int_res_chain1 = set()\n",
+    "    for atom in chain1_atoms:\n",
+    "        neighbors_chain2 = ns_chain2.search(atom.coord, distance_cutoff)\n",
+    "        if neighbors_chain2:\n",
+    "            int_res_chain1.add(atom.get_full_id()[3][1])\n",
+    "\n",
+    "    int_res_chain2 = set()\n",
+    "    for atom in chain2_atoms:\n",
+    "        neighbors_chain1 = ns_chain1.search(atom.coord, distance_cutoff)\n",
+    "        if neighbors_chain1:\n",
+    "            int_res_chain2.add(atom.get_full_id()[3][1])\n",
+    "\n",
+    "    return list(int_res_chain1), list(int_res_chain2)\n",
+    "\n",
+    "# load the structure \n",
+    "pdb_parser = PDB.PDBParser(QUIET=True)\n",
+    "structure = pdb_parser.get_structure(\"example\", \"/home/irene/Documents/BIOPYISICS/step_2/6m0j_fixed.pdb\")\n",
+    "\n",
+    "chain1_id = \"A\"\n",
+    "chain2_id = \"E\"\n",
+    "distance = 5\n",
+    "\n",
+    "# output\n",
+    "int_res_chain1, int_res_chain2 = get_interface_residues(structure, chain1_id, chain2_id, distance)\n",
+    "\n",
+    "print(f\"Interface residues in Chain {chain1_id}: {int_res_chain1}\")\n",
+    "print(f\"Interface residues in Chain {chain2_id}: {int_res_chain2}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "40eafc2f",
+   "metadata": {},
+   "source": [
+    "### OPTION CODE 2"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6c816de4",
+   "metadata": {},
+   "source": [
+    "**Detects interface residues within a distance(dist)**\n",
+    "\n",
+    "Assumes two chains, i.e. a unique interface set per chain."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 65,
+   "id": "10a44fb7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_interface(st, dist):\n",
+    "    select_ats = []\n",
+    "    for at in st.get_atoms():\n",
+    "        # Skip Hydrogens to reduce time\n",
+    "        if at.element != 'H':\n",
+    "            select_ats.append(at)\n",
+    "    nbsearch = NeighborSearch(select_ats)\n",
+    "    interface = {}\n",
+    "    # Sets are more efficient than lists. Use sets when order is not relevant\n",
+    "    for ch in st[0]:\n",
+    "        interface[ch.id] = set()\n",
+    "\n",
+    "    for at1, at2 in nbsearch.search_all(dist):\n",
+    "        #Only different chains\n",
+    "        res1 = at1.get_parent()\n",
+    "        ch1 = res1.get_parent()\n",
+    "        res2 = at2.get_parent()\n",
+    "        ch2 = res2.get_parent()\n",
+    "        if ch1 != ch2:\n",
+    "            interface[ch1.id].add(res1)\n",
+    "            interface[ch2.id].add(res2)\n",
+    "    return interface"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2c0eb806",
+   "metadata": {},
+   "source": [
+    "**HERE YOU CAN MODIFY THE DISTANCE** We put 5 for the results that are displayed in the notebook"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 80,
+   "id": "98a02de1",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "What is the distance cutoff?: 5\n"
+     ]
+    }
+   ],
+   "source": [
+    "pdb_path = '/home/irene/Documents/BIOPYISICS/step_2/6m0j_fixed.pdb'\n",
+    "parser = PDBParser(PERMISSIVE=1)\n",
+    "dist = input(\"What is the distance cutoff?: \")\n",
+    "dist = float(dist)\n",
+    "st = parser.get_structure('st', pdb_path)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 81,
+   "id": "348e9ce1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "interface_residues = get_interface(st, distance)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ebe45221",
+   "metadata": {},
+   "source": [
+    "# STEP 2"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b654e1c0",
+   "metadata": {},
+   "source": [
+    "Add atom parameters (for step 3)\n",
+    "\n",
+    "*This step is not necessary for step 2 but it will be for the step 3)*"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 82,
+   "id": "f332956e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ala_atoms = {'N', 'H', 'CA', 'HA', 'C', 'O', 'CB', 'HB', 'HB1', 'HB2', 'HB3', 'HA1', 'HA2', 'HA3'}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 83,
+   "id": "7b66134b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def residue_id(res):\n",
+    "    '''Returns readable residue id'''\n",
+    "    return '{} {}{}'.format(res.get_resname(), res.get_parent().id, res.id[1])\n",
+    "\n",
+    "def atom_id(at):\n",
+    "    '''Returns readable atom id'''\n",
+    "    return '{}.{}'.format(residue_id(at.get_parent()), at.id)\n",
+    "\n",
+    "def add_atom_parameters(st, res_lib, ff_params):\n",
+    "    ''' Adds parameters from libraries to atom .xtra field\n",
+    "        For not recognized atoms, issues a warning and put default parameters\n",
+    "    '''\n",
+    "    for at in st.get_atoms():\n",
+    "        resname = at.get_parent().get_resname()\n",
+    "        params = res_lib.get_params(resname, at.id)\n",
+    "        if not params:\n",
+    "            print(\"WARNING: residue/atom pair not in library (\"+atom_id(at) + ')')\n",
+    "            at.xtra['atom_type'] = at.element\n",
+    "            at.xtra['charge'] = 0\n",
+    "        else:\n",
+    "            at.xtra['atom_type'] = params.at_type\n",
+    "            at.xtra['charge'] = params.charge\n",
+    "        at.xtra['vdw'] = ff_params.at_types[at.xtra['atom_type']]\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 84,
+   "id": "ef448ecf",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def calc_int_energies(st, res):\n",
+    "    '''Returns interaction energies (residue against other chains)\n",
+    "        for all atoms and for Ala atoms\n",
+    "    '''\n",
+    "    elec = 0.\n",
+    "    elec_ala = 0.\n",
+    "    vdw = 0.\n",
+    "    vdw_ala = 0.\n",
+    "\n",
+    "    for at1 in res.get_atoms():\n",
+    "        for at2 in st.get_atoms():\n",
+    "        # skip same chain atom pairs\n",
+    "            if at2.get_parent().get_parent() != res.get_parent():\n",
+    "                r = at1 - at2\n",
+    "                e = elec_int(at1, at2, r)\n",
+    "                elec += e\n",
+    "                if at1.id in ala_atoms: #GLY are included implicitly\n",
+    "                    elec_ala += e\n",
+    "                e = vdw_int(at1, at2, r)\n",
+    "                vdw += e\n",
+    "                if at1.id in ala_atoms: #GLY are included implicitly\n",
+    "                    vdw_ala += e\n",
+    "    return elec, elec_ala, vdw, vdw_ala\n",
+    "\n",
+    "def MH_diel(r):\n",
+    "    '''Mehler-Solmajer dielectric'''\n",
+    "    return 86.9525 / (1 - 7.7839 * math.exp(-0.3153 * r)) - 8.5525\n",
+    "\n",
+    "def elec_int(at1, at2, r):\n",
+    "    '''Electrostatic interaction energy between two atoms at r distance'''\n",
+    "    return 332.16 * at1.xtra['charge'] * at2.xtra['charge'] / MH_diel(r) / r\n",
+    "\n",
+    "def vdw_int(at1, at2, r):\n",
+    "    '''Vdw interaction energy between two atoms'''\n",
+    "    eps12 = math.sqrt(at1.xtra['vdw'].eps * at2.xtra['vdw'].eps)\n",
+    "    sig12_2 = at1.xtra['vdw'].sig * at2.xtra['vdw'].sig\n",
+    "    return 4 * eps12 * (sig12_2**6/r**12 - sig12_2**3/r**6)\n",
+    "\n",
+    "def calc_solvation(st, res):\n",
+    "    '''Solvation energy based on ASA'''\n",
+    "    solv = 0.\n",
+    "    solv_ala = 0.\n",
+    "    for at in res.get_atoms():\n",
+    "        if 'EXP_NACCESS' not in at.xtra:\n",
+    "            continue\n",
+    "        s = float(at.xtra['EXP_NACCESS'])* at.xtra['vdw'].fsrf\n",
+    "        solv += s\n",
+    "        if at.id in ala_atoms:\n",
+    "            solv_ala += s\n",
+    "    return solv, solv_ala"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 85,
+   "id": "c6689a03",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class ResiduesDataLib():\n",
+    "    def __init__(self, fname):\n",
+    "        self.residue_data = {}\n",
+    "        try:\n",
+    "            fh = open(fname, \"r\")\n",
+    "        except OSError:\n",
+    "            print(\"#ERROR while loading library file (\", fname, \")\")\n",
+    "            sys.exit(2)\n",
+    "        for line in fh:\n",
+    "            if line[0] == '#':\n",
+    "                continue\n",
+    "            data = line.split()\n",
+    "            r = Residue(data)\n",
+    "            self.residue_data[r.id] = r\n",
+    "        self.nres = len(self.residue_data)\n",
+    "\n",
+    "    def get_params(self, resid, atid):\n",
+    "        atom_id = resid + ':' + atid\n",
+    "        if atom_id in self.residue_data:\n",
+    "            return self.residue_data[atom_id]\n",
+    "        else:\n",
+    "            print(\"WARNING: atom not found in library (\", atom_id, ')')\n",
+    "            return None\n",
+    "\n",
+    "class Residue():\n",
+    "    def __init__(self, data):\n",
+    "        self .id = data[0] + ':' + data[1]\n",
+    "        self.at_type = data[2]\n",
+    "        self.charge = float(data[3])\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 86,
+   "id": "7dfe02ac",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class AtomType():\n",
+    "    def __init__(self, data):\n",
+    "        self.id   = data[0]\n",
+    "        self.eps  = float(data[1])\n",
+    "        self.sig  = float(data[2])\n",
+    "        self.mass = float(data[3])\n",
+    "        self.fsrf = float(data[4])\n",
+    "        self.rvdw = self.sig * 0.5612\n",
+    "        \n",
+    "class VdwParamset(): #extracted from GELPI's github\n",
+    "    #parameters for the VdW\n",
+    "    def __init__ (self, file_name):\n",
+    "        self.at_types = {}\n",
+    "        try:\n",
+    "            fh = open(file_name, \"r\")\n",
+    "        except OSError:\n",
+    "            print (\"#ERROR while loading parameter file (\", file_name, \")\")\n",
+    "            sys.exit(2)\n",
+    "        for line in fh:\n",
+    "            if line[0] == '#':\n",
+    "                continue\n",
+    "            data = line.split()\n",
+    "            self.at_types[data[0]] = AtomType(data)\n",
+    "        self.ntypes = len(self.at_types)\n",
+    "        fh.close()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f64ae4ef",
+   "metadata": {},
+   "source": [
+    "Loading parameters and libraries from external files"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 87,
+   "id": "309776fd",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "NACCESS_BINARY = '/home/irene/Documents/BIOPYISICS/step_2/Parameters_solvation/soft/NACCESS/naccess'"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 88,
+   "id": "9a1299e2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "res_lib = ResiduesDataLib('/home/irene/Documents/BIOPYISICS/step_2/residue_library.txt')\n",
+    "ff_params = VdwParamset('/home/irene/Documents/BIOPYISICS/step_2/vdwprm')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 89,
+   "id": "351cb829",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "add_atom_parameters(st, res_lib, ff_params)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 90,
+   "id": "39dd07b6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "try:\n",
+    "    srf = NACCESS_atomic(st[0], naccess_binary=NACCESS_BINARY)\n",
+    "except Exception as e:\n",
+    "    print(\"Error:\", e)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8cdb0852",
+   "metadata": {},
+   "source": [
+    "## INTERFACE RESIDUES"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 91,
+   "id": "1566460e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "io = PDBIO()\n",
+    "st_chains = {}\n",
+    "# Using BioIO trick (see tutorial) to select chains\n",
+    "class SelectChain(Select):\n",
+    "    def __init__(self, chid):\n",
+    "        self.id = chid\n",
+    "\n",
+    "    def accept_chain(self, chain):\n",
+    "        if chain.id == self.id:\n",
+    "            return 1\n",
+    "        else:\n",
+    "            return 0\n",
+    "\n",
+    "for ch in st[0]:\n",
+    "    io.set_structure(st)\n",
+    "    io.save('tmp.pdb', SelectChain(ch.id))\n",
+    "    st_chains[ch.id] = parser.get_structure('stA', 'tmp.pdb')\n",
+    "    add_atom_parameters(st_chains[ch.id], res_lib, ff_params)\n",
+    "    srfA = NACCESS_atomic(st_chains[ch.id][0], naccess_binary=NACCESS_BINARY)\n",
+    "os.remove('tmp.pdb')\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 92,
+   "id": "9e7b60b7",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "D#SER A19          0.2146    -0.9124    -3.3193    -4.3155 -     -0.0754    -0.8309    -2.0507    -3.0470\n",
+      "D#GLN A24          0.3970    -3.1127    -1.6921    -2.3669 -     -0.0513    -2.2888     0.0054     0.1187\n",
+      "D#THR A27          0.0910    -6.3293    -0.7176     0.3967 -      0.1451    -3.4757     0.0503     0.1325\n",
+      "D#PHE A28         -0.0334    -3.5589     0.4867     1.4307 -      0.0063    -2.2468     0.0000     0.0269\n",
+      "D#ASP A30          1.5443    -2.8606    -1.6757    -3.2389 -     -0.0119    -0.6429    -0.0194     0.1087\n",
+      "D#LYS A31          0.7437    -7.5409    -0.2075    -2.2041 -      0.0331    -3.1152     0.0000     0.2945\n",
+      "D#HIE A34         -0.0984     0.0561    -1.7502    -2.7201 -     -0.0130    -1.9926    -0.0840     0.2956\n",
+      "D#GLU A35          0.2204    -1.9406    -1.9623    -2.6746 -     -0.0263    -0.6161     0.0077    -0.0468\n",
+      "D#GLU A37         -0.4083    -2.4799    -0.8292    -1.1856 -     -0.0617    -0.5009     0.0815     0.0815\n",
+      "D#ASP A38          0.3563    -2.6430    -0.5729    -2.1615 -     -0.0421    -1.0614     0.2445     0.2445\n",
+      "D#TYR A41         -0.2163    -6.7019     0.0000     1.6475 -      0.0154    -0.6369     0.0000     0.0000\n",
+      "D#GLN A42          0.3602    -2.1349    -0.5082    -5.3941 -     -0.0107    -0.5042     0.1685     0.1685\n",
+      "D#LEU A45         -0.0259    -2.0164     0.4276     0.9795 -     -0.0350    -0.3334     0.0346     0.0346\n",
+      "D#LEU A79          0.0279    -1.8401     0.6568     1.1229 -      0.0287    -0.8249     0.0000    -0.0040\n",
+      "D#MET A82          0.0099    -1.7127     1.3497     1.7381 -      0.0119    -0.2360    -0.1464    -0.1490\n",
+      "D#TYR A83         -0.2434    -4.5149    -0.0025     0.1313 -      0.0025    -0.3171     0.0000     0.0000\n",
+      "D#ASN A330         0.0840    -2.1638    -0.9541    -3.4380 -     -0.0078    -0.4213    -0.0533    -0.0533\n",
+      "D#LYS A353         1.4586   -10.8435    -0.3823    -2.8366 -      0.4709    -5.2251    -0.2263    -0.3738\n",
+      "D#GLY A354         0.0233    -3.5821    -0.3471    -1.0562 -      0.0233    -3.5821    -0.3471    -1.0562\n",
+      "D#ASP A355        -0.5292    -4.2816     0.0180     0.1439 -     -0.0200    -2.4013     0.0559     0.2121\n",
+      "D#ARG A357         0.2434    -1.4927    -0.4835    -1.2802 -      0.0071    -0.0712     0.0000     0.0000\n",
+      "D#ARG A393         0.3150    -0.7057    -1.3050    -1.9995 -      0.0089    -0.0306    -0.3374    -0.3374\n",
+      "D#LYS E417        -1.4374    -1.7500    -0.6074    -1.5622 -     -0.1535    -0.1854    -0.2472    -0.2472\n",
+      "D#GLY E446         0.0913    -1.4578     0.2880    -0.1158 -      0.0913    -1.4578     0.2880    -0.1158\n",
+      "D#GLY E447        -0.0264    -0.5804    -0.2134    -0.2134 -     -0.0264    -0.5804    -0.2134    -0.2134\n",
+      "D#TYR E449         0.8178    -0.7884     5.3278     5.3905 -     -0.0530    -0.1499    -0.1714    -0.1714\n",
+      "D#TYR E453         0.0355     4.8877     0.4708    -0.2208 -     -0.0272    -0.1202     0.0000     0.0000\n",
+      "D#LEU E455        -0.0930    -5.8183     0.0000     0.7778 -      0.1501    -0.8339     0.0000     0.0000\n",
+      "D#PHE E456         0.0228    -3.8441     0.8316     5.8422 -     -0.0256    -0.4129    -0.0051    -0.0051\n",
+      "D#TYR E473         0.0389    -1.2143    -0.4632     0.2189 -     -0.0179    -0.2140     0.0361     0.0361\n",
+      "D#ALA E475         0.0800    -2.8709    -0.1913    -0.5966 -      0.0800    -2.8709    -0.1913    -0.5966\n",
+      "D#GLY E476         0.0371    -1.5770    -0.1850     0.0291 -      0.0371    -1.5770    -0.1850     0.0291\n",
+      "D#GLU E484         3.6390    -0.7443    -3.6175    -4.5811 -      0.2365    -0.1838    -0.9155    -0.9155\n",
+      "D#PHE E486         0.0224    -7.1179     3.3957    13.0041 -     -0.0411    -1.4804    -0.9784    -0.9333\n",
+      "D#ASN E487         0.1874    -2.2256    -0.7451    -3.7258 -      0.0561    -1.5207    -0.1347    -0.2047\n",
+      "D#TYR E489        -0.2728    -8.7345     1.6392     5.1759 -     -0.1722    -0.9877     0.0009     0.0816\n",
+      "D#GLN E493         0.3826    -3.5572    -0.4030    -1.4090 -      0.0086    -0.8044     0.0116     0.0118\n",
+      "D#GLY E496         0.3690    -2.1078    -0.6628    -1.4492 -      0.3690    -2.1078    -0.6628    -1.4492\n",
+      "D#GLN E498         0.4942    -6.3140     0.0199    -2.3979 -     -0.0216    -1.6677     0.0089     0.0358\n",
+      "D#THR E500        -0.2014    -7.5293     0.5302    -0.0311 -     -1.1865    -5.6354     0.0094    -0.3378\n",
+      "D#ASN E501         0.0319    -8.0223    -0.1854    -0.8729 -      0.2996    -4.6573    -0.1276    -0.0007\n",
+      "D#GLY E502         0.1981    -2.2134     0.2332    -0.8271 -      0.1981    -2.2134     0.2332    -0.8271\n",
+      "D#TYR E505        -0.0195    -9.5552     1.6062     7.2427 -     -0.0071    -1.9954    -0.0339    -0.0122\n",
+      "Interaction energy based in interface residues only\n",
+      "Total Elec Int.     :      8.9322\n",
+      "Total Vdw Int.      :   -146.4477\n",
+      "Total Solv AB       :     -6.7017\n",
+      "Total Solv         A:    -29.2811\n",
+      "Total Solv         E:     19.6783\n",
+      "DGintAB-A-B         :   -134.6145\n",
+      "The total interaction energy of the interface residues is -134.61452624957326\n"
+     ]
+    }
+   ],
+   "source": [
+    "## Initiatlize Energy aggregates\n",
+    "elec = {}\n",
+    "elec_ala = {}\n",
+    "\n",
+    "vdw = {}\n",
+    "vdw_ala = {}\n",
+    "\n",
+    "solvAB = {}\n",
+    "solvAB_ala = {}\n",
+    "\n",
+    "solvA = {}\n",
+    "solvA_ala = {}\n",
+    "\n",
+    "totalIntElec = 0.\n",
+    "totalIntVdw = 0.\n",
+    "totalSolv = 0.\n",
+    "totalSolvMon = {}\n",
+    "\n",
+    "\n",
+    "## We get the chsin ids,not always they are A and B\n",
+    "chids = []\n",
+    "for ch in st[0]:\n",
+    "    chids.append(ch.id)\n",
+    "    totalSolvMon[ch.id] = 0\n",
+    "\n",
+    "total = 0.\n",
+    "\n",
+    "for ch in st[0]:\n",
+    "    for res in ch.get_residues():\n",
+    "        if dist > 0 and res not in interface_residues[ch.id]:\n",
+    "            continue\n",
+    "        \n",
+    "        elec[res], elec_ala[res], vdw[res], vdw_ala[res] = calc_int_energies(st[0], res)\n",
+    "        solvAB[res], solvAB_ala[res] = calc_solvation(st[0], res)\n",
+    "        solvA[res], solvA_ala[res] = calc_solvation(\n",
+    "            st_chains[ch.id],\n",
+    "            st_chains[ch.id][0][ch.id][res.id[1]]\n",
+    "        )\n",
+    "        totalIntElec += elec[res]\n",
+    "        totalIntVdw += vdw[res]\n",
+    "        totalSolv += solvAB[res]\n",
+    "        totalSolvMon[ch.id] += solvA[res]\n",
+    "        total += elec[res] + vdw[res] + solvAB[res] - solvA[res]\n",
+    "        \n",
+    "        print(\n",
+    "            'D#{:11} {:11.4f}{:11.4f}{:11.4f}{:11.4f} - {:11.4f}{:11.4f}{:11.4f}{:11.4f}'.format(\n",
+    "                residue_id(res),\n",
+    "                elec[res], vdw[res], solvAB[res], solvA[res],\n",
+    "                elec_ala[res], vdw_ala[res], solvAB_ala[res], solvA_ala[res]\n",
+    "            )\n",
+    "        )\n",
+    "        \n",
+    "        \n",
+    "print(\"Interaction energy based in interface residues only\")\n",
+    "print('{:20}: {:11.4f}'.format('Total Elec Int.', totalIntElec))\n",
+    "print('{:20}: {:11.4f}'.format('Total Vdw Int.', totalIntVdw))\n",
+    "print('{:20}: {:11.4f}'.format('Total Solv AB', totalSolv))\n",
+    "print('{:19}{}: {:11.4f}'.format('Total Solv ', chids[0], totalSolvMon[chids[0]]))\n",
+    "print('{:19}{}: {:11.4f}'.format('Total Solv ', chids[1], totalSolvMon[chids[1]]))\n",
+    "print('{:20}: {:11.4f}'.format('DGintAB-A-B', total))\n",
+    "\n",
+    "\n",
+    "print(f'The total interaction energy of the interface residues is {total}')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6de014e2",
+   "metadata": {},
+   "source": [
+    "## TOTAL ENERGY IN THE COMPLEX (CHAIN A AND E)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "id": "bc2ac926",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def calc_solvation(st, res):\n",
+    "    '''Solvation energy based on ASA'''\n",
+    "    solv = 0.\n",
+    "\n",
+    "    for at in res.get_atoms():\n",
+    "        if 'EXP_NACCESS' not in at.xtra:\n",
+    "            continue\n",
+    "        s = float(at.xtra['EXP_NACCESS'])* at.xtra['vdw'].fsrf\n",
+    "        solv += s\n",
+    "\n",
+    "    return solv\n",
+    "def calc_int_energies(st, res):\n",
+    "    '''Returns interaction energies (residue against other chains)\n",
+    "        for all atoms and for Ala atoms\n",
+    "    '''\n",
+    "    elec = 0.\n",
+    "    vdw = 0.\n",
+    "\n",
+    "    for at1 in res.get_atoms():\n",
+    "        for at2 in st.get_atoms():\n",
+    "        # skip same chain atom pairs\n",
+    "            if at2.get_parent().get_parent() != res.get_parent():\n",
+    "                r = at1 - at2\n",
+    "                e = elec_int(at1, at2, r)\n",
+    "                elec += e\n",
+    "                \n",
+    "                e = vdw_int(at1, at2, r)\n",
+    "                vdw += e\n",
+    "\n",
+    "    return elec + vdw\n",
+    "\n",
+    "\n",
+    "\n",
+    "def compute_energy_interface(st, all_res):\n",
+    "    total_molec_energy = 0.0\n",
+    "    energy_vdw_elect = 0.0\n",
+    "    energy_solv_complex = 0.0\n",
+    "    energy_solv_A = 0.0\n",
+    "    energy_solv_B = 0.0\n",
+    "    \n",
+    "    for chain, conjunt in all_res.items():\n",
+    "        for residue in conjunt:\n",
+    "            energy_vdw_elect += calc_int_energies(st, residue)\n",
+    "            energy_solv_complex += calc_solvation(st, residue)\n",
+    "            \n",
+    "            if chain == 'A': # We compute the solvation energy of the residues of the A chain\n",
+    "                energy_solv_A += calc_solvation(st, residue)\n",
+    "\n",
+    "            else: # We compute the solvation energy of the residues of the E chain\n",
+    "                energy_solv_B += calc_solvation(st, residue)\n",
+    "\n",
+    "                \n",
+    "    total_molec_energy = (energy_vdw_elect + energy_solv_complex - energy_solv_A - energy_solv_B) # We compute the total energy\n",
+    "\n",
+    "    return energy_vdw_elect, energy_solv_complex, energy_solv_A, energy_solv_B, total_molec_energy"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 59,
+   "id": "246f06b2",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Interaction energy of residues in the complex\n",
+      "Total Elec Int & Vdw Int.:   -176.7422\n",
+      "Total Solv AB       :   -507.1030\n",
+      "Total Solv         A:   -398.5663\n",
+      "Total Solv         E:   -108.5366\n",
+      "DGintAB-A-B         :   -176.7422\n"
+     ]
+    }
+   ],
+   "source": [
+    "total_molec_energy = 0.0\n",
+    "energy_vdw_elect = 0.0\n",
+    "energy_solv_complex = 0.0\n",
+    "energy_solv_A = 0.0\n",
+    "energy_solv_B = 0.0\n",
+    "model = st[0] # We only have one model.\n",
+    "\n",
+    "for chain in model.get_chains(): # We iterate over the 2 chains, A and E. \n",
+    "    for residue in chain.get_residues(): # We iterate over all the residues of the structure\n",
+    "        energy_vdw_elect += calc_int_energies(st, residue) # We compute all vdw and electrostatic energies of all residues\n",
+    "        energy_solv_complex += calc_solvation(model, residue) # We compute all solvation energy of the residues of the complex AE\n",
+    "        if chain.id == 'A': # We compute the solvation energy of the residues of the A chain\n",
+    "            energy_solv_A += calc_solvation(st_chains['A'], st[0]['A'][residue.id[1]])\n",
+    "        else: # We compute the solvation energy of the residues of the E chain\n",
+    "            energy_solv_B += calc_solvation(st_chains['E'], st[0]['E'][residue.id[1]])\n",
+    "\n",
+    "\n",
+    "total_molec_energy = (energy_vdw_elect + energy_solv_complex - energy_solv_A - energy_solv_B) # We compute the total energy\n",
+    "\n",
+    "print(\"Interaction energy of residues in the complex\")\n",
+    "print('{:20}: {:11.4f}'.format('Total Elec Int & Vdw Int.', energy_vdw_elect))\n",
+    "print('{:20}: {:11.4f}'.format('Total Solv AB', energy_solv_complex))\n",
+    "print('{:19}{}: {:11.4f}'.format('Total Solv ', chids[0], energy_solv_A))\n",
+    "print('{:19}{}: {:11.4f}'.format('Total Solv ', chids[1],energy_solv_B))\n",
+    "print('{:20}: {:11.4f}'.format('DGintAB-A-B', total_molec_energy))\n"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.9.13"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
