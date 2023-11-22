@@ -7,7 +7,7 @@
 This repository hosts the materials for the Energy analysis exercise 2023-24 (Spike RBD-ACE2: Protein-protein interface analysis) project, a part of the Biophysics course at ESCI-UPF. The project has been conducted under the tutelage of Professors: 
 - Irene Acero I Pousa
 - Josep Gelpi Buchaca
-- Alberto Meseguer Donlo.
+- Alberto Meseguer Donlo
 
 ## Table of Contents
 1. [Introduction](#introduction)
