@@ -40,7 +40,7 @@ The `REPORT.pdf` file provides a comprehensive analysis of our findings and inte
 
 ## Contributors
 This project is a collaborative work by the following contributors:
-- Alessandra Nayeli Bonilla Salon ([alessandra.bonilla@alum.esci.upf.edu](mailto:alessandra.bonilla@alum.esci.upf.edu))
+- Alessandra Bonilla Salon ([alessandra.bonilla@alum.esci.upf.edu](mailto:alessandra.bonilla@alum.esci.upf.edu))
 - Alexandra Caus Carrascosa ([alexandra.caus@alum.esci.upf.edu](mailto:alexandra.caus@alum.esci.upf.edu))
 - Paula Martin Cabezas ([paula.martin@alum.esci.upf.edu](mailto:paula.martin@alum.esci.upf.edu))
 - Irene Porta Bravo ([irene.porta1423@alum.esci.upf.edu](mailto:irene.porta1423@alum.esci.upf.edu))
